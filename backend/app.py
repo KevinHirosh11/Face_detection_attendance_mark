@@ -1,5 +1,4 @@
 import streamlit.components.v1 as components
-from secrets import choice
 import streamlit as st
 
 #opencv library
@@ -47,11 +46,15 @@ st.markdown(hhide_st_style, unsafe_allow_html=True) #hide streamlit menu
 menu = ["HOME","MARK ATTENDANCE", "REGISTER", "ATTENDANCE SHEET", "KNOW MORE"] #menu
 choice = st.sidebar.selectbox("Menu", menu) #sidebar menu
 
-path = 'Register_Data' #path to save image
-images = [] #list of image
-classNames = [] #list of class
-myList = os.listdir(path) #list of image
+path = 'Register_Data'
+images = []
+classNames = []
 
+# Create folder if it doesn't exist
+if not os.path.exists(path):
+    os.makedirs(path)
+
+myList = os.listdir(path)
 
 col1, col2, col3 = st.columns(3) #columns
 cap = cv2.VideoCapture(0) #capture video
@@ -76,22 +79,42 @@ if choice == 'MARK ATTENDANCE':
             return encodeList
 
         def faceList(name):
-            with open('Attendance_Sheet.csv', 'r+') as f:
-                myDataList = f.readlines()
-                nameList = []
-                for line in myDataList:
-                    entry = line.split(',')
-                    nameList.append(entry[0])
-                if name not in nameList:
-                    now = datetime.now()
-                    dtString = now.strftime('%H:%M:%S')
-                    dStr = now.strftime('%d:%m:%Y')
-                    f.writelines(f'\n{name},{dtString},{dStr}')
+          file_path = 'attendance_sheet.csv'
+
+          # Create file with header if not exists
+          if not os.path.exists(file_path):
+              with open(file_path, 'w') as f:
+                  f.write("Name,Time,Date")
+
+          with open(file_path, 'r+') as f:
+              myDataList = f.readlines()
+              nameList = []
+              for line in myDataList:
+                  entry = line.split(',')
+                  nameList.append(entry[0])
+
+              if name not in nameList:
+                  now = datetime.now()
+                  dtString = now.strftime('%H:%M:%S')
+                  dStr = now.strftime('%d:%m:%Y')
+                  f.writelines(f'\n{name},{dtString},{dStr}')
+
 
         encodeListUnkown = findEncodings(images)
         print('encoding complate!')
         while True:
-            success, img = cap.read()
+            run = st.checkbox("MARK YOUR PRESENCE")
+
+            if run:
+                cap = cv2.VideoCapture(0)
+                stop = st.button("Stop Camera")
+
+                while not stop:
+                    success, img = cap.read()
+                    if not success:
+                        st.error("Camera not working")
+                        break
+
             imgS = cv2.resize(img,(0,0),None,0.25,0.25)
             imgS = cv2.cvtColor(imgS,cv2.COLOR_BGR2RGB)
             faceCurFrame = face_recognition.face_locations(imgS)
@@ -146,9 +169,9 @@ elif choice == 'REGISTER':
 #read data menu
 elif choice == 'ATTENDANCE SHEET':
     with col2:
-        df = pd.read_csv('Attendance_Sheet.csv')
+        df = pd.read_csv('attendance_sheet.csv')
         st.subheader("READ ATTENDANCE SHEET")
-        df = pd.read_csv('Attendance_Sheet.csv')
+        df = pd.read_csv('attendance_sheet.csv')
         st.write(df)
 elif choice == 'HOME':
     st.markdown("""
@@ -172,7 +195,7 @@ elif choice == 'HOME':
 
 """, unsafe_allow_html=True)
     with col1:
-        st.image("face-recogination.jpg",width=800, caption="Advance Attendance System Using Face Recognition") 
+        st.image("face/face.jpg",width=800, caption="Advance Attendance System Using Face Recognition") 
 
 elif choice == "KNOW MORE":
     st.subheader("KNOW HERE HOW TO USE THIS SYSTEM")
