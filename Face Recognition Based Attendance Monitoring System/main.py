@@ -35,10 +35,9 @@ def contact():
 def check_haarcascadefile():
     exists = os.path.isfile("haarcascade_frontalface_default.xml")
     if exists:
-        pass
-    else:
-        mess._show(title='Some file missing', message='Please contact us for help')
-        window.destroy()
+        return True
+    mess._show(title='Some file missing', message='Please contact us for help')
+    return False
 
 ###################################################################################
 
@@ -145,7 +144,8 @@ def clear2():
 #######################################################################################
 
 def TakeImages():
-    check_haarcascadefile()
+    if not check_haarcascadefile():
+        return
     columns = ['SERIAL NO.', '', 'ID', '', 'NAME']
     assure_path_exists("StudentDetails/")
     assure_path_exists("TrainingImage/")
@@ -207,7 +207,8 @@ def TakeImages():
 ########################################################################################
 
 def TrainImages():
-    check_haarcascadefile()
+    if not check_haarcascadefile():
+        return
     assure_path_exists("TrainingImageLabel/")
     recognizer = cv2.face_LBPHFaceRecognizer.create()
     harcascadePath = "haarcascade_frontalface_default.xml"
@@ -248,7 +249,8 @@ def getImagesAndLabels(path):
 ###########################################################################################
 
 def TrackImages():
-    check_haarcascadefile()
+    if not check_haarcascadefile():
+        return
     assure_path_exists("Attendance/")
     assure_path_exists("StudentDetails/")
     for k in tv.get_children():
@@ -276,7 +278,7 @@ def TrackImages():
         mess._show(title='Details Missing', message='Students details are missing, please check!')
         cam.release()
         cv2.destroyAllWindows()
-        window.destroy()
+        return
     while True:
         ret, im = cam.read()
         gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
