@@ -354,7 +354,7 @@ def TrackImages():
             serial, conf = recognizer.predict(gray[y:y + h, x:x + w])
             if (conf < 50):
                 ts = time.time()
-                date = datetime.datetime.fromtimestamp(ts).strftime('%d-%m-%Y')
+                date = datetime.datetime.fromtimestamp(ts).strftime('%D-%m-%Y')
                 timeStamp = datetime.datetime.fromtimestamp(ts).strftime('%H:%M:%S')
                 aa = df.loc[df['SERIAL NO.'] == serial]['NAME'].values
                 ID = df.loc[df['SERIAL NO.'] == serial]['ID'].values
