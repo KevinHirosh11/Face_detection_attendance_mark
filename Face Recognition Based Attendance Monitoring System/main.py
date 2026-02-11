@@ -13,10 +13,20 @@ import time
 
 ############################################# FUNCTIONS ################################################
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def app_path(*parts):
+    return os.path.join(BASE_DIR, *parts)
+
 def assure_path_exists(path):
-    dir = os.path.dirname(path)
-    if not os.path.exists(dir):
-        os.makedirs(dir)
+    # Accept either a directory path (ending with / or \) or a file path.
+    if path.endswith(('/', '\\')):
+        dir_path = path
+    else:
+        dir_path = os.path.dirname(path)
+    if dir_path and not os.path.exists(dir_path):
+        os.makedirs(dir_path)
 
 ##################################################################################
 
@@ -68,19 +78,21 @@ def contact():
 ###################################################################################
 
 def check_haarcascadefile():
-    exists = os.path.isfile("haarcascade_frontalface_default.xml")
+    cascade_path = app_path("haarcascade_frontalface_default.xml")
+    exists = os.path.isfile(cascade_path)
     if exists:
         return True
-    mess._show(title='Some file missing', message='Please contact us for help')
+    mess._show(title='Some file missing', message=f"Missing: {cascade_path}\n\nMake sure haarcascade_frontalface_default.xml is in the same folder as main.py")
     return False
 
 ###################################################################################
 
 def save_pass():
-    assure_path_exists("TrainingImageLabel/")
-    exists1 = os.path.isfile("TrainingImageLabel\psd.txt")
+    assure_path_exists(app_path("TrainingImageLabel" + os.sep))
+    psd_path = app_path("TrainingImageLabel", "psd.txt")
+    exists1 = os.path.isfile(psd_path)
     if exists1:
-        tf = open("TrainingImageLabel\psd.txt", "r")
+        tf = open(psd_path, "r")
         key = tf.read()
     else:
         master.destroy()
@@ -88,7 +100,7 @@ def save_pass():
         if new_pas == None:
             mess._show(title='No Password Entered', message='Password not set!! Please try again')
         else:
-            tf = open("TrainingImageLabel\psd.txt", "w")
+            tf = open(psd_path, "w")
             tf.write(new_pas)
             mess._show(title='Password Registered', message='New password was registered successfully!!')
             return
@@ -97,7 +109,7 @@ def save_pass():
     nnewp = (nnew.get())
     if (op == key):
         if(newp == nnewp):
-            txf = open("TrainingImageLabel\psd.txt", "w")
+            txf = open(psd_path, "w")
             txf.write(newp)
         else:
             mess._show(title='Error', message='Confirm new password again!!!')
@@ -141,17 +153,18 @@ def change_pass():
 #####################################################################################
 
 def psw():
-    assure_path_exists("TrainingImageLabel/")
-    exists1 = os.path.isfile("TrainingImageLabel\psd.txt")
+    assure_path_exists(app_path("TrainingImageLabel" + os.sep))
+    psd_path = app_path("TrainingImageLabel", "psd.txt")
+    exists1 = os.path.isfile(psd_path)
     if exists1:
-        tf = open("TrainingImageLabel\psd.txt", "r")
+        tf = open(psd_path, "r")
         key = tf.read()
     else:
         new_pas = tsd.askstring('Old Password not found', 'Please enter a new password below', show='*')
         if new_pas == None:
             mess._show(title='No Password Entered', message='Password not set!! Please try again')
         else:
-            tf = open("TrainingImageLabel\psd.txt", "w")
+            tf = open(psd_path, "w")
             tf.write(new_pas)
             mess._show(title='Password Registered', message='New password was registered successfully!!')
             return
@@ -182,19 +195,20 @@ def TakeImages():
     if not check_haarcascadefile():
         return
     columns = ['SERIAL NO.', '', 'ID', '', 'NAME']
-    assure_path_exists("StudentDetails/")
-    assure_path_exists("TrainingImage/")
+    assure_path_exists(app_path("StudentDetails" + os.sep))
+    assure_path_exists(app_path("TrainingImage" + os.sep))
     serial = 0
-    exists = os.path.isfile("StudentDetails\StudentDetails.csv")
+    student_csv = app_path("StudentDetails", "StudentDetails.csv")
+    exists = os.path.isfile(student_csv)
     if exists:
-        with open("StudentDetails\StudentDetails.csv", 'r') as csvFile1:
+        with open(student_csv, 'r') as csvFile1:
             reader1 = csv.reader(csvFile1)
             for l in reader1:
                 serial = serial + 1
         serial = (serial // 2)
         csvFile1.close()
     else:
-        with open("StudentDetails\StudentDetails.csv", 'a+') as csvFile1:
+        with open(student_csv, 'a+') as csvFile1:
             writer = csv.writer(csvFile1)
             writer.writerow(columns)
             serial = 1
@@ -206,7 +220,7 @@ def TakeImages():
         if cam is None:
             mess._show(title='Camera Error', message='Could not open the camera.\n\nClose other apps using the webcam and allow camera permission for Python/OpenCV, then try again.')
             return
-        harcascadePath = "haarcascade_frontalface_default.xml"
+        harcascadePath = app_path("haarcascade_frontalface_default.xml")
         detector = cv2.CascadeClassifier(harcascadePath)
         sampleNum = 0
         while (True):
@@ -223,7 +237,7 @@ def TakeImages():
                 # incrementing sample number
                 sampleNum = sampleNum + 1
                 # saving the captured face in the dataset folder TrainingImage
-                img_path = os.path.join("TrainingImage", f"{name}.{serial}.{Id}.{sampleNum}.jpg")
+                img_path = app_path("TrainingImage", f"{name}.{serial}.{Id}.{sampleNum}.jpg")
                 cv2.imwrite(img_path, gray[y:y + h, x:x + w])
             # display the frame (even if no face is detected)
             cv2.imshow('Taking Images', img)
@@ -237,7 +251,7 @@ def TakeImages():
         cv2.destroyAllWindows()
         res = "Images Taken for ID : " + Id
         row = [serial, '', Id, '', name]
-        with open('StudentDetails\StudentDetails.csv', 'a+') as csvFile:
+        with open(student_csv, 'a+') as csvFile:
             writer = csv.writer(csvFile)
             writer.writerow(row)
         csvFile.close()
@@ -252,17 +266,17 @@ def TakeImages():
 def TrainImages():
     if not check_haarcascadefile():
         return
-    assure_path_exists("TrainingImageLabel/")
+    assure_path_exists(app_path("TrainingImageLabel" + os.sep))
     recognizer = cv2.face_LBPHFaceRecognizer.create()
-    harcascadePath = "haarcascade_frontalface_default.xml"
+    harcascadePath = app_path("haarcascade_frontalface_default.xml")
     detector = cv2.CascadeClassifier(harcascadePath)
-    faces, ID = getImagesAndLabels("TrainingImage")
+    faces, ID = getImagesAndLabels(app_path("TrainingImage"))
     try:
         recognizer.train(faces, np.array(ID))
     except:
         mess._show(title='No Registrations', message='Please Register someone first!!!')
         return
-    recognizer.save("TrainingImageLabel\Trainner.yml")
+    recognizer.save(app_path("TrainingImageLabel", "Trainner.yml"))
     res = "Profile Saved Successfully"
     message1.configure(text=res)
     message.configure(text='Total Registrations till now  : ' + str(ID[0]))
@@ -294,21 +308,22 @@ def getImagesAndLabels(path):
 def TrackImages():
     if not check_haarcascadefile():
         return
-    assure_path_exists("Attendance/")
-    assure_path_exists("StudentDetails/")
+    assure_path_exists(app_path("Attendance" + os.sep))
+    assure_path_exists(app_path("StudentDetails" + os.sep))
     for k in tv.get_children():
         tv.delete(k)
     msg = ''
     i = 0
     j = 0
     recognizer = cv2.face.LBPHFaceRecognizer_create()  # cv2.createLBPHFaceRecognizer()
-    exists3 = os.path.isfile("TrainingImageLabel\Trainner.yml")
+    trainer_path = app_path("TrainingImageLabel", "Trainner.yml")
+    exists3 = os.path.isfile(trainer_path)
     if exists3:
-        recognizer.read("TrainingImageLabel\Trainner.yml")
+        recognizer.read(trainer_path)
     else:
         mess._show(title='Data Missing', message='Please click on Save Profile to reset data!!')
         return
-    harcascadePath = "haarcascade_frontalface_default.xml"
+    harcascadePath = app_path("haarcascade_frontalface_default.xml")
     faceCascade = cv2.CascadeClassifier(harcascadePath)
 
     cam = open_camera()
@@ -317,9 +332,10 @@ def TrackImages():
         return
     font = cv2.FONT_HERSHEY_SIMPLEX
     col_names = ['Id', '', 'Name', '', 'Date', '', 'Time']
-    exists1 = os.path.isfile("StudentDetails\StudentDetails.csv")
+    student_csv = app_path("StudentDetails", "StudentDetails.csv")
+    exists1 = os.path.isfile(student_csv)
     if exists1:
-        df = pd.read_csv("StudentDetails\StudentDetails.csv")
+        df = pd.read_csv(student_csv)
     else:
         mess._show(title='Details Missing', message='Students details are missing, please check!')
         cam.release()
@@ -357,19 +373,20 @@ def TrackImages():
             break
     ts = time.time()
     date = datetime.datetime.fromtimestamp(ts).strftime('%d-%m-%Y')
-    exists = os.path.isfile("Attendance\Attendance_" + date + ".csv")
+    attendance_csv = app_path("Attendance", "Attendance_" + date + ".csv")
+    exists = os.path.isfile(attendance_csv)
     if exists:
-        with open("Attendance\Attendance_" + date + ".csv", 'a+') as csvFile1:
+        with open(attendance_csv, 'a+') as csvFile1:
             writer = csv.writer(csvFile1)
             writer.writerow(attendance)
         csvFile1.close()
     else:
-        with open("Attendance\Attendance_" + date + ".csv", 'a+') as csvFile1:
+        with open(attendance_csv, 'a+') as csvFile1:
             writer = csv.writer(csvFile1)
             writer.writerow(col_names)
             writer.writerow(attendance)
         csvFile1.close()
-    with open("Attendance\Attendance_" + date + ".csv", 'r') as csvFile1:
+    with open(attendance_csv, 'r') as csvFile1:
         reader1 = csv.reader(csvFile1)
         for lines in reader1:
             i = i + 1
@@ -462,9 +479,10 @@ lbl3 = tk.Label(frame1, text="Attendance",width=20  ,fg="black"  ,bg="#c79cff"  
 lbl3.place(x=100, y=115)
 
 res=0
-exists = os.path.isfile("StudentDetails\StudentDetails.csv")
+student_csv = app_path("StudentDetails", "StudentDetails.csv")
+exists = os.path.isfile(student_csv)
 if exists:
-    with open("StudentDetails\StudentDetails.csv", 'r') as csvFile1:
+    with open(student_csv, 'r') as csvFile1:
         reader1 = csv.reader(csvFile1)
         for l in reader1:
             res = res + 1
