@@ -20,6 +20,41 @@ def assure_path_exists(path):
 
 ##################################################################################
 
+def open_camera(preferred_indexes=(0, 1, 2)):
+    """Best-effort webcam open with Windows backend fallbacks.
+
+    Returns an opened cv2.VideoCapture or None.
+    """
+    if os.name == 'nt':
+        backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY]
+    else:
+        backends = [cv2.CAP_ANY]
+
+    for index in preferred_indexes:
+        for backend in backends:
+            try:
+                cap = cv2.VideoCapture(index, backend)
+            except TypeError:
+                cap = cv2.VideoCapture(index)
+
+            if cap is None or not cap.isOpened():
+                if cap is not None:
+                    cap.release()
+                continue
+
+            # Warm up the camera a bit (first frame can be blank on Windows)
+            for _ in range(10):
+                ok, frame = cap.read()
+                if ok and frame is not None:
+                    return cap
+                time.sleep(0.05)
+
+            cap.release()
+
+    return None
+
+##################################################################################
+
 def tick():
     time_string = time.strftime('%H:%M:%S')
     clock.config(text=time_string)
@@ -28,7 +63,7 @@ def tick():
 ###################################################################################
 
 def contact():
-    mess._show(title='Contact us', message="Please contact us on : 'shubhamkumar8180323@gmail.com' ")
+    mess._show(title='Contact us', message="Please contact us on : 'kevin.com' ")
 
 ###################################################################################
 
@@ -167,12 +202,20 @@ def TakeImages():
     Id = (txt.get())
     name = (txt2.get())
     if ((name.isalpha()) or (' ' in name)):
-        cam = cv2.VideoCapture(0)
+        cam = open_camera()
+        if cam is None:
+            mess._show(title='Camera Error', message='Could not open the camera.\n\nClose other apps using the webcam and allow camera permission for Python/OpenCV, then try again.')
+            return
         harcascadePath = "haarcascade_frontalface_default.xml"
         detector = cv2.CascadeClassifier(harcascadePath)
         sampleNum = 0
         while (True):
             ret, img = cam.read()
+            if not ret or img is None:
+                # Try again (camera can take a moment to start)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+                continue
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             faces = detector.detectMultiScale(gray, 1.3, 5)
             for (x, y, w, h) in faces:
@@ -180,10 +223,10 @@ def TakeImages():
                 # incrementing sample number
                 sampleNum = sampleNum + 1
                 # saving the captured face in the dataset folder TrainingImage
-                cv2.imwrite("TrainingImage\ " + name + "." + str(serial) + "." + Id + '.' + str(sampleNum) + ".jpg",
-                            gray[y:y + h, x:x + w])
-                # display the frame
-                cv2.imshow('Taking Images', img)
+                img_path = os.path.join("TrainingImage", f"{name}.{serial}.{Id}.{sampleNum}.jpg")
+                cv2.imwrite(img_path, gray[y:y + h, x:x + w])
+            # display the frame (even if no face is detected)
+            cv2.imshow('Taking Images', img)
             # wait for 100 miliseconds
             if cv2.waitKey(100) & 0xFF == ord('q'):
                 break
@@ -266,9 +309,12 @@ def TrackImages():
         mess._show(title='Data Missing', message='Please click on Save Profile to reset data!!')
         return
     harcascadePath = "haarcascade_frontalface_default.xml"
-    faceCascade = cv2.CascadeClassifier(harcascadePath);
+    faceCascade = cv2.CascadeClassifier(harcascadePath)
 
-    cam = cv2.VideoCapture(0)
+    cam = open_camera()
+    if cam is None:
+        mess._show(title='Camera Error', message='Could not open the camera.\n\nClose other apps using the webcam and allow camera permission for Python/OpenCV, then try again.')
+        return
     font = cv2.FONT_HERSHEY_SIMPLEX
     col_names = ['Id', '', 'Name', '', 'Date', '', 'Time']
     exists1 = os.path.isfile("StudentDetails\StudentDetails.csv")
@@ -281,6 +327,10 @@ def TrackImages():
         return
     while True:
         ret, im = cam.read()
+        if not ret or im is None:
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+            continue
         gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
         faces = faceCascade.detectMultiScale(gray, 1.2, 5)
         for (x, y, w, h) in faces:
