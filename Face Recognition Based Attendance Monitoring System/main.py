@@ -92,25 +92,25 @@ def save_pass():
     psd_path = app_path("TrainingImageLabel", "psd.txt")
     exists1 = os.path.isfile(psd_path)
     if exists1:
-        tf = open(psd_path, "r")
-        key = tf.read()
+        with open(psd_path, "r", encoding="utf-8") as tf:
+            key = tf.read().strip()
     else:
         master.destroy()
         new_pas = tsd.askstring('Old Password not found', 'Please enter a new password below', show='*')
         if new_pas == None:
             mess._show(title='No Password Entered', message='Password not set!! Please try again')
         else:
-            tf = open(psd_path, "w")
-            tf.write(new_pas)
+            with open(psd_path, "w", encoding="utf-8") as tf:
+                tf.write(new_pas.strip())
             mess._show(title='Password Registered', message='New password was registered successfully!!')
             return
-    op = (old.get())
-    newp= (new.get())
-    nnewp = (nnew.get())
+    op = (old.get() or "").strip()
+    newp = (new.get() or "").strip()
+    nnewp = (nnew.get() or "").strip()
     if (op == key):
         if(newp == nnewp):
-            txf = open(psd_path, "w")
-            txf.write(newp)
+            with open(psd_path, "w", encoding="utf-8") as txf:
+                txf.write(newp)
         else:
             mess._show(title='Error', message='Confirm new password again!!!')
             return
@@ -157,19 +157,19 @@ def psw():
     psd_path = app_path("TrainingImageLabel", "psd.txt")
     exists1 = os.path.isfile(psd_path)
     if exists1:
-        tf = open(psd_path, "r")
-        key = tf.read()
+        with open(psd_path, "r", encoding="utf-8") as tf:
+            key = tf.read().strip()
     else:
         new_pas = tsd.askstring('Old Password not found', 'Please enter a new password below', show='*')
         if new_pas == None:
             mess._show(title='No Password Entered', message='Password not set!! Please try again')
         else:
-            tf = open(psd_path, "w")
-            tf.write(new_pas)
+            with open(psd_path, "w", encoding="utf-8") as tf:
+                tf.write(new_pas.strip())
             mess._show(title='Password Registered', message='New password was registered successfully!!')
             return
     password = tsd.askstring('Password', 'Enter Password', show='*')
-    if (password == key):
+    if ((password or "").strip() == key):
         TrainImages()
     elif (password == None):
         pass
