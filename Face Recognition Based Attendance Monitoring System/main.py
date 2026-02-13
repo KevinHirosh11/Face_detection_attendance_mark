@@ -10,11 +10,25 @@ from PIL import Image
 import pandas as pd
 import datetime
 import time
+import sqlite3
+from flask import Flask, render_template, request, redirect, url_for
+from flask_cors import CORS
+import mysql.connector
 
 ############################################# FUNCTIONS ################################################
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+DB_CONFIG = {
+    'host': 'localhost',
+    'user': 'root',
+    'password': '',  
+    'database': 'smart_attendance'
+}
+
+def get_db_connection():
+    conn = mysql.connector.connect(**DB_CONFIG)
+    return conn
 
 def app_path(*parts):
     return os.path.join(BASE_DIR, *parts)
@@ -27,6 +41,104 @@ def assure_path_exists(path):
         dir_path = os.path.dirname(path)
     if dir_path and not os.path.exists(dir_path):
         os.makedirs(dir_path)
+
+def init_db():
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS students (
+                serial_no INT PRIMARY KEY,
+                student_id VARCHAR(50),
+                name VARCHAR(100),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY idx_students_student_id (student_id)
+            )ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS images (
+                id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                serial_no INTEGER,
+                student_id VARCHAR(50),
+                name VARCHAR(100),
+                file_path TEXT NOT NULL,
+                sample_num INTEGER,
+                captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(serial_no) REFERENCES students(serial_no) ON DELETE CASCADE
+            )ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS attendance (
+                id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                student_id VARCHAR(50),
+                name VARCHAR(100),
+                date VARCHAR(20),
+                time VARCHAR(20),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+def db_upsert_student(serial_no: int, student_id: str, name: str) -> None:
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO students(serial_no, student_id, name, updated_at)
+            VALUES(%s, %s, %s, CURRENT_TIMESTAMP)
+            ON DUPLICATE KEY UPDATE
+                student_id=VALUES(student_id),
+                name=VALUES(name),
+                updated_at=CURRENT_TIMESTAMP;
+            """,
+            (int(serial_no), str(student_id), str(name)),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def db_insert_image(serial_no: int, student_id: str, name: str, file_path: str, sample_num: int) -> None:
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        rel_path = os.path.relpath(file_path, BASE_DIR)
+        cur.execute(
+            """
+            INSERT INTO images(serial_no, student_id, name, file_path, sample_num)
+            VALUES(%s, %s, %s, %s, %s);
+            """,
+            (int(serial_no), str(student_id), str(name), rel_path, int(sample_num)),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def db_insert_attendance(student_id: str, name: str, date: str, time_value: str) -> None:
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO attendance(student_id, name, date, time)
+            VALUES(%s, %s, %s, %s);
+            """,
+            (str(student_id), str(name), str(date), str(time_value)),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 ##################################################################################
 
@@ -216,6 +328,8 @@ def TakeImages():
     Id = (txt.get())
     name = (txt2.get())
     if ((name.isalpha()) or (' ' in name)):
+        # Ensure the database exists before we start saving
+        init_db()
         cam = open_camera()
         if cam is None:
             mess._show(title='Camera Error', message='Could not open the camera.\n\nClose other apps using the webcam and allow camera permission for Python/OpenCV, then try again.')
@@ -239,6 +353,13 @@ def TakeImages():
                 # saving the captured face in the dataset folder TrainingImage
                 img_path = app_path("TrainingImage", f"{name}.{serial}.{Id}.{sampleNum}.jpg")
                 cv2.imwrite(img_path, gray[y:y + h, x:x + w])
+                # Also store metadata in SQLite (path + mapping)
+                try:
+                    db_upsert_student(serial_no=serial, student_id=Id, name=name)
+                    db_insert_image(serial_no=serial, student_id=Id, name=name, file_path=img_path, sample_num=sampleNum)
+                except Exception:
+                    # Keep the original CSV/folder workflow working even if DB insert fails
+                    pass
             # display the frame (even if no face is detected)
             cv2.imshow('Taking Images', img)
             # wait for 100 miliseconds
@@ -308,6 +429,7 @@ def getImagesAndLabels(path):
 def TrackImages():
     if not check_haarcascadefile():
         return
+    init_db()
     assure_path_exists(app_path("Attendance" + os.sep))
     assure_path_exists(app_path("StudentDetails" + os.sep))
     for k in tv.get_children():
@@ -363,6 +485,10 @@ def TrackImages():
                 bb = str(aa)
                 bb = bb[2:-2]
                 attendance = [str(ID), '', bb, '', str(date), '', str(timeStamp)]
+                try:
+                    db_insert_attendance(student_id=str(ID), name=str(bb), date=str(date), time_value=str(timeStamp))
+                except Exception:
+                    pass
 
             else:
                 Id = 'Unknown'
