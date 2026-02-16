@@ -463,6 +463,9 @@ def TrackImages():
         cam.release()
         cv2.destroyAllWindows()
         return
+    session_date = datetime.datetime.now().strftime('%d-%m-%Y')
+    attendance_csv = app_path("Attendance", "Attendance_" + session_date + ".csv")
+    attendance_header_written = os.path.isfile(attendance_csv)
     while True:
         ret, im = cam.read()
         if not ret or im is None:
@@ -476,7 +479,7 @@ def TrackImages():
             serial, conf = recognizer.predict(gray[y:y + h, x:x + w])
             if (conf < 50):
                 ts = time.time()
-                date = datetime.datetime.fromtimestamp(ts).strftime('%D-%m-%Y')
+                date = datetime.datetime.fromtimestamp(ts).strftime('%d-%m-%Y')
                 timeStamp = datetime.datetime.fromtimestamp(ts).strftime('%H:%M:%S')
                 aa = df.loc[df['SERIAL NO.'] == serial]['NAME'].values
                 ID = df.loc[df['SERIAL NO.'] == serial]['ID'].values
@@ -485,6 +488,12 @@ def TrackImages():
                 bb = str(aa)
                 bb = bb[2:-2]
                 attendance = [str(ID), '', bb, '', str(date), '', str(timeStamp)]
+                with open(attendance_csv, 'a+') as csvFile1:
+                    writer = csv.writer(csvFile1)
+                    if not attendance_header_written:
+                        writer.writerow(col_names)
+                        attendance_header_written = True
+                    writer.writerow(attendance)
                 try:
                     db_insert_attendance(student_id=str(ID), name=str(bb), date=str(date), time_value=str(timeStamp))
                 except Exception:
@@ -497,21 +506,11 @@ def TrackImages():
         cv2.imshow('Taking Attendance', im)
         if (cv2.waitKey(1) == ord('q')):
             break
-    ts = time.time()
-    date = datetime.datetime.fromtimestamp(ts).strftime('%d-%m-%Y')
-    attendance_csv = app_path("Attendance", "Attendance_" + date + ".csv")
-    exists = os.path.isfile(attendance_csv)
-    if exists:
-        with open(attendance_csv, 'a+') as csvFile1:
-            writer = csv.writer(csvFile1)
-            writer.writerow(attendance)
-        csvFile1.close()
-    else:
-        with open(attendance_csv, 'a+') as csvFile1:
-            writer = csv.writer(csvFile1)
-            writer.writerow(col_names)
-            writer.writerow(attendance)
-        csvFile1.close()
+    if not os.path.isfile(attendance_csv):
+        cam.release()
+        cv2.destroyAllWindows()
+        mess._show(title='Attendance Missing', message='No attendance was recorded in this session.')
+        return
     with open(attendance_csv, 'r') as csvFile1:
         reader1 = csv.reader(csvFile1)
         for lines in reader1:
